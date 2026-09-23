@@ -14,7 +14,11 @@ void MouseView::handleEvent(const SDL_Event& e) {
         state_.onMotion(e.motion);
     } else if (e.type == SDL_EVENT_MOUSE_WHEEL) {
         state_.onWheel(e.wheel);
-    } else if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN && e.button.button == SDL_BUTTON_LEFT) {
+    } else if (e.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+        state_.onButton(e.button);
+    } else if (e.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+        state_.onButton(e.button);
+        if (e.button.button != SDL_BUTTON_LEFT) return;
         const SDL_FPoint p{e.button.x, e.button.y};
         if (p.x >= toggleRect_.x && p.x <= toggleRect_.x + toggleRect_.w && p.y >= toggleRect_.y &&
             p.y <= toggleRect_.y + toggleRect_.h) {
@@ -38,7 +42,8 @@ void MouseView::draw(Canvas& c, const SDL_FRect& a) {
             relativeMode_ ? "on (deltas only, cursor hidden)" : "off");
     y += 30;
 
-    // ---- Silhouette: body + left/right/middle buttons + two side buttons.
+    // ---- Silhouette: body + left/right/middle buttons, X1/X2 on the left side,
+    // and extra buttons 6-8 on the right side.
     const float bodyW = 140, bodyH = 220, bx = x, by = y;
     const bool l = state_.buttons & SDL_BUTTON_LMASK, r = state_.buttons & SDL_BUTTON_RMASK,
                m = state_.buttons & SDL_BUTTON_MMASK, x1 = state_.buttons & SDL_BUTTON_X1MASK,
@@ -59,6 +64,13 @@ void MouseView::draw(Canvas& c, const SDL_FRect& a) {
     c.fillCircle(bx - 14, by + 160, 12, x2 ? colors::accent : colors::idle);
     c.strokeCircle(bx - 14, by + 160, 12, colors::outline);
     c.text(bx - 20, by + 152, "2", x2 ? colors::bg : colors::dim, 1.0f);
+    for (int b = 6; b <= 8; ++b) {
+        const bool on = state_.buttons & SDL_BUTTON_MASK(b);
+        const float cy = by + 130 + (b - 6) * 30;
+        c.fillCircle(bx + bodyW + 14, cy, 12, on ? colors::accent : colors::idle);
+        c.strokeCircle(bx + bodyW + 14, cy, 12, colors::outline);
+        c.textf(bx + bodyW + 8, cy - 8, on ? colors::bg : colors::dim, 1.0f, "%d", b);
+    }
 
     // ---- Wheel meter to the right of the body.
     const float wx = bx + bodyW + 50, wy = by, wh = bodyH;
@@ -91,8 +103,15 @@ void MouseView::draw(Canvas& c, const SDL_FRect& a) {
 
     // ---- Numeric readout + relative-mode toggle.
     float ty = by + bodyH + 40;
-    c.textf(x, ty, colors::text, 1.3f, "buttons: %s%s%s%s%s", l ? "L " : "", r ? "R " : "", m ? "M " : "",
-            x1 ? "X1 " : "", x2 ? "X2 " : "");
+    c.textf(x, ty, colors::text, 1.3f, "buttons: %s%s%s%s%s%s%s%s", l ? "L " : "", r ? "R " : "", m ? "M " : "",
+            x1 ? "X1 " : "", x2 ? "X2 " : "", (state_.buttons & SDL_BUTTON_MASK(6)) ? "6 " : "",
+            (state_.buttons & SDL_BUTTON_MASK(7)) ? "7 " : "", (state_.buttons & SDL_BUTTON_MASK(8)) ? "8 " : "");
+    ty += 22;
+    if (state_.lastButton)
+        c.textf(x, ty, colors::text, 1.3f, "last button event: #%d %s", state_.lastButton,
+                state_.lastButtonDown ? "down" : "up");
+    else
+        c.text(x, ty, "last button event: none", colors::dim, 1.3f);
     ty += 22;
     c.textf(x, ty, colors::text, 1.3f, "last delta: %+.0f, %+.0f", state_.relX, state_.relY);
     ty += 22;

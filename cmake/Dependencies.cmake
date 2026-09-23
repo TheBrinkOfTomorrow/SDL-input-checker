@@ -8,7 +8,7 @@ FetchContent_Declare(SDL3
     GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
     GIT_TAG        release-3.4.16
     GIT_SHALLOW    TRUE
-    FIND_PACKAGE_ARGS 3.2 CONFIG
+    FIND_PACKAGE_ARGS 3.4 CONFIG  # 3.4+ for SDL_SavePNG
 )
 FetchContent_MakeAvailable(SDL3)
 

@@ -38,7 +38,7 @@ private:
     float time_ = 0.0f;
     int frame_ = 0;
     std::unique_ptr<VirtualJoystick> virtualJs_;
-    const char* screenshotPath_ = nullptr;  // SIC_SCREENSHOT env: save a frame as BMP and quit
+    const char* screenshotPath_ = nullptr;  // SIC_SCREENSHOT env: save a frame as PNG (or BMP for .bmp) and quit
     int screenshotFrame_ = 30;               // SIC_SCREENSHOT_FRAME env
     Uint64 lastTicks_ = 0;
     bool quitRequested_ = false;

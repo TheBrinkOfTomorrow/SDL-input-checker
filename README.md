@@ -38,7 +38,8 @@ picture of what the selected one is reporting.
   layout, so a non-US layout shows its own characters on the same physical
   positions. Includes a last-key panel (name/scancode/keycode/repeat) and a
   text-input box for checking dead-key and IME composition.
-- **Mouse view**: button state, an XY motion-trail pad, a decaying wheel
+- **Mouse view**: state of up to 8 buttons (L, R, M, X1, X2, 6–8) plus the
+  raw index of the last button event, an XY motion-trail pad, a decaying wheel
   meter, and a toggle for relative (captured) mouse mode.
 
 ## Building
@@ -108,13 +109,13 @@ plugging in hardware, useful for screenshots and quick manual checks:
 | `--virtual` | Attaches an SDL virtual joystick with animated axes/buttons/hat and selects it at startup. |
 | `SIC_SELECT=<kind>` | Auto-selects the first device of the given kind (`gamepad`, `joystick`, `keyboard`, `mouse`) at startup, instead of requiring a sidebar click. |
 | `SIC_WINDOW_SIZE=WxH` | Opens the window at a specific size, e.g. `800x500`, for resize testing. |
-| `SIC_SCREENSHOT=path.bmp` | Saves one frame as a BMP and quits. |
+| `SIC_SCREENSHOT=path.png` | Saves one frame as a PNG (or BMP if the path ends in `.bmp`) and quits. |
 | `SIC_SCREENSHOT_FRAME=N` | Which frame number to save (default 30). |
 
 Example:
 
 ```bash
-SIC_SELECT=gamepad SIC_SCREENSHOT=/tmp/frame.bmp ./build/debug/sdl-input-checker --virtual
+SIC_SELECT=gamepad SIC_SCREENSHOT=/tmp/frame.png ./build/debug/sdl-input-checker --virtual
 ```
 
 ## Project layout

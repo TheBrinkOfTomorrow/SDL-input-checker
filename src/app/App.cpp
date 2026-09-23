@@ -182,9 +182,13 @@ SDL_AppResult App::iterate() {
     SDL_SetRenderScale(renderer_, 1.0f, 1.0f);
     if (screenshotPath_ && frame_ == screenshotFrame_) {
         if (SDL_Surface* surf = SDL_RenderReadPixels(renderer_, nullptr)) {
-            SDL_SaveBMP(surf, screenshotPath_);
+            // PNG unless the path explicitly asks for .bmp.
+            const size_t len = SDL_strlen(screenshotPath_);
+            const bool bmp = len >= 4 && SDL_strcasecmp(screenshotPath_ + len - 4, ".bmp") == 0;
+            const bool ok = bmp ? SDL_SaveBMP(surf, screenshotPath_) : SDL_SavePNG(surf, screenshotPath_);
             SDL_DestroySurface(surf);
-            SDL_Log("Saved screenshot to %s", screenshotPath_);
+            if (ok) SDL_Log("Saved screenshot to %s", screenshotPath_);
+            else    SDL_Log("Failed to save screenshot to %s: %s", screenshotPath_, SDL_GetError());
         }
         SDL_RenderPresent(renderer_);
         return SDL_APP_SUCCESS;

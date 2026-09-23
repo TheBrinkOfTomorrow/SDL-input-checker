@@ -89,7 +89,7 @@ Common: each view draws into a fixed 1280×800 logical canvas with the sidebar r
   - a mapping-info box showing SDL's mapping string and whether it came from the built-in DB, a hint, or the OS.
 - **JoystickView** — no assumptions: one horizontal bar per axis, a grid of button squares, one 9-way indicator per hat, ball deltas. This is also the "raw" tab for a gamepad.
 - **KeyboardView** — draw a full ANSI layout (rows defined in a small table of `{scancode, x, y, w, h, label}`), highlight pressed keys, show modifier state, a "last key" panel (name, scancode, keycode, repeat flag), and a text-input box to verify IME/dead-key output. Rendering keys by scancode keeps the physical layout correct on non-US keyboards while labels can come from `SDL_GetKeyFromScancode` to reflect the OS layout.
-- **MouseView** — mouse silhouette with five buttons lit, wheel meter that decays, an XY pad drawing the motion trail, numeric read-out of position and last delta, and a toggle for `SDL_SetWindowRelativeMouseMode` to test raw/captured motion.
+- **MouseView** — mouse silhouette with up to eight buttons lit (L, R, M, X1, X2, 6–8), wheel meter that decays, an XY pad drawing the motion trail, numeric read-out of position and last delta, and a toggle for `SDL_SetWindowRelativeMouseMode` to test raw/captured motion.
 
 Input focus rule: when a gamepad is selected, disable ImGui gamepad navigation so all pad input reaches the view; keyboard/mouse still drive the sidebar.
 

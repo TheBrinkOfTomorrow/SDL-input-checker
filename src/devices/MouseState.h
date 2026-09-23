@@ -13,10 +13,16 @@ struct MouseState {
     float relX = 0, relY = 0;   // accumulated since last sample()
     float wheelX = 0, wheelY = 0;  // decaying display values
     std::deque<SDL_FPoint> trail;
+    int lastButton = 0;         // SDL button index of the most recent press/release (0 = none yet)
+    bool lastButtonDown = false;
 
     void onMotion(const SDL_MouseMotionEvent& e) {
         relX += e.xrel;
         relY += e.yrel;
+    }
+    void onButton(const SDL_MouseButtonEvent& e) {
+        lastButton = e.button;
+        lastButtonDown = e.down;
     }
     void onWheel(const SDL_MouseWheelEvent& e) {
         wheelX += e.x;
