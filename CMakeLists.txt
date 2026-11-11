@@ -15,6 +15,7 @@ add_executable(sdl-input-checker
     src/app/App.cpp
     src/app/Ui.cpp
     src/devices/DeviceRegistry.cpp
+    src/devices/HardwareProbe.cpp
     src/devices/KeyboardLayout.cpp
     src/devices/VirtualJoystick.cpp
     src/draw/Canvas.cpp
@@ -25,6 +26,10 @@ add_executable(sdl-input-checker
 )
 target_include_directories(sdl-input-checker PRIVATE src)
 target_link_libraries(sdl-input-checker PRIVATE SDL3::SDL3 imgui)
+if(APPLE)
+    # HardwareProbe reads the IOKit registry to find USB controllers SDL can't see.
+    target_link_libraries(sdl-input-checker PRIVATE "-framework IOKit" "-framework CoreFoundation")
+endif()
 
 if(MSVC)
     target_compile_options(sdl-input-checker PRIVATE /W4)
