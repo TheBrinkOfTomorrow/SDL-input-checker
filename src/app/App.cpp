@@ -84,7 +84,11 @@ bool App::init(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--diagnose") == 0) {
             // Headless: print what the OS sees vs what SDL sees, then quit.
+            // SDL's macOS/Linux backends report some joysticks asynchronously, so give
+            // them a moment to arrive before comparing against the OS's view.
+            for (int t = 0; t < 40; ++t) { SDL_PumpEvents(); SDL_Delay(25); }
             registry_.refresh();
+            probe_.setGracePeriodMs(0);  // already waited above
             probe_.refresh();
             std::fputs(probe_.report().c_str(), stdout);
             diagnoseOnly_ = true;
@@ -133,7 +137,9 @@ bool App::init(int argc, char** argv) {
     if (const char* f = SDL_getenv("SIC_SCREENSHOT_FRAME")) screenshotFrame_ = SDL_atoi(f);
 
     registry_.refresh();
-    runProbe();
+    // First USB scan shortly after startup; HardwareProbe's grace period keeps
+    // controllers that are still on their way into SDL from being flagged.
+    probeTimer_ = 0.5f;
     if (virtualJs_) registry_.selectJoystickId(virtualJs_->id());
     if (const char* sel = SDL_getenv("SIC_SELECT")) {
         // Dev aid: "keyboard", "mouse", "gamepad", or "joystick" selects the first
@@ -145,7 +151,7 @@ bool App::init(int argc, char** argv) {
                                (SDL_strcmp(sel, "joystick") == 0 && d.id.kind == DeviceKind::Joystick);
             if (match) { registry_.select(d.id); break; }
         }
-        if (SDL_strcmp(sel, "diagnostics") == 0 && !probe_.findings().empty()) ui_.selectFinding(0);
+        if (SDL_strcmp(sel, "diagnostics") == 0) { probe_.refresh(); if (!probe_.findings().empty()) ui_.selectFinding(0); }
     }
     lastTicks_ = SDL_GetTicksNS();
     return true;

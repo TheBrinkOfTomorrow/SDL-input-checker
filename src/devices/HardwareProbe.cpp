@@ -217,24 +217,54 @@ void HardwareProbe::refresh() {
     findings_.clear();
 
     // What SDL already enumerated, by vendor/product.
+    // On macOS SDL may pick a pad up through Apple's GameController framework, which
+    // reports Apple's own vendor/product (05ac:...) instead of the real USB ids, so
+    // fall back to matching on the product name too.
     std::set<std::pair<Uint16, Uint16>> sdlJoysticks, sdlGamepads;
+    std::set<std::string> sdlNames, sdlGamepadNames;
+    auto lower = [](std::string v) {
+        std::transform(v.begin(), v.end(), v.begin(), [](unsigned char c) { return static_cast<char>(SDL_tolower(c)); });
+        return v;
+    };
     int n = 0;
     if (SDL_JoystickID* ids = SDL_GetJoysticks(&n)) {
         for (int i = 0; i < n; ++i) {
             const std::pair<Uint16, Uint16> vp{SDL_GetJoystickVendorForID(ids[i]), SDL_GetJoystickProductForID(ids[i])};
+            const char* nm = SDL_GetJoystickNameForID(ids[i]);
+            const std::string name = lower(nm ? nm : "");
             sdlJoysticks.insert(vp);
-            if (SDL_IsGamepad(ids[i])) sdlGamepads.insert(vp);
+            if (!name.empty()) sdlNames.insert(name);
+            if (SDL_IsGamepad(ids[i])) {
+                sdlGamepads.insert(vp);
+                if (!name.empty()) sdlGamepadNames.insert(name);
+            }
         }
         SDL_free(ids);
     }
+    auto nameMatch = [&](const std::set<std::string>& names, const UsbDevice& d) {
+        if (d.name.empty()) return false;
+        const std::string a = lower(d.name);
+        for (const std::string& b : names)
+            if (a.find(b) != std::string::npos || b.find(a) != std::string::npos) return true;
+        return false;
+    };
     const HidGamepadIds hid = hidGamepads();
+
+    const Uint64 now = SDL_GetTicks();
+    std::map<std::pair<Uint16, Uint16>, Uint64> stillHere;
+    for (const UsbDevice& d : usb_) {
+        const std::pair<Uint16, Uint16> vp{d.vendor, d.product};
+        auto it = firstSeen_.find(vp);
+        stillHere[vp] = it == firstSeen_.end() ? now : it->second;
+    }
+    firstSeen_.swap(stillHere);
 
     for (const UsbDevice& d : usb_) {
         const std::pair<Uint16, Uint16> vp{d.vendor, d.product};
         const ModeSwitchPad* msp = modeSwitchPad(d.vendor, d.product);
         const bool xinput = isXInputClass(d) || (msp && msp->xinputPid == d.product);
         const bool hidPad = hid.ids.count(vp) > 0;
-        const bool seen = sdlJoysticks.count(vp) > 0;
+        const bool seen = sdlJoysticks.count(vp) > 0 || nameMatch(sdlNames, d);
         const char* known = msp ? msp->name : nullptr;
 
         if (!xinput && !hidPad && !msp) continue;  // not a game controller as far as we can tell
@@ -249,7 +279,7 @@ void HardwareProbe::refresh() {
         }
 
         if (seen) {
-            if (!sdlGamepads.count(vp)) {
+            if (!sdlGamepads.count(vp) && !nameMatch(sdlGamepadNames, d)) {
                 findings_.push_back({FindingLevel::Info, label(d, known), "Seen as a raw joystick only",
                                      "SDL opened this controller but has no gamepad mapping for it, so it is listed "
                                      "under Joystick with numbered axes and buttons instead of named ones. A mapping "
@@ -288,7 +318,7 @@ void HardwareProbe::refresh() {
             if (msp) {
                 detail += std::string("\n\nFix: slide the X/D switch on the controller to D. The receiver will "
                                       "re-enumerate as product id ") + hex4(msp->dinputPid) +
-                          " (a normal HID gamepad), which SDL picks up immediately. The receiver only changes "
+                          " (a normal HID gamepad), which SDL picks up. The receiver only changes "
                           "identity once the controller reconnects: press a button (or the Logitech button) to wake "
                           "it, and if the id below still reads " + hex4(msp->xinputPid) +
                           ", unplug and re-plug the receiver.";
@@ -299,6 +329,7 @@ void HardwareProbe::refresh() {
         }
 
         // A HID gamepad (or a known mode-switch pad in D mode) that SDL did not list.
+        if (now - firstSeen_[vp] < graceMs_) continue;  // SDL may simply not have caught up yet
         std::string detail = "The OS reports a HID game controller with this id, but SDL did not open it. ";
 #if defined(__linux__)
         bool unreadable = false;

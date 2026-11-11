@@ -1,7 +1,9 @@
 #pragma once
 #include <SDL3/SDL.h>
 
+#include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 // Looks at the OS's own view of attached hardware (IOKit on macOS, sysfs on
@@ -52,7 +54,13 @@ public:
 
     static std::vector<UsbDevice> listUsbDevices();
 
+    // A newly attached HID controller reaches SDL a moment after the OS sees it;
+    // "not opened by SDL" is only reported once it has been present this long.
+    void setGracePeriodMs(Uint64 ms) { graceMs_ = ms; }
+
 private:
     std::vector<UsbDevice> usb_;
     std::vector<Finding> findings_;
+    std::map<std::pair<Uint16, Uint16>, Uint64> firstSeen_;  // vid/pid -> SDL_GetTicks() when first listed
+    Uint64 graceMs_ = 3000;
 };
