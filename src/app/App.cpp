@@ -4,6 +4,7 @@
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
 
+#include <cstdio>
 #include <cstring>
 
 #include "views/GamepadView.h"
@@ -80,6 +81,21 @@ bool App::init(int argc, char** argv) {
         return false;
     }
 
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--diagnose") == 0) {
+            // Headless: print what the OS sees vs what SDL sees, then quit.
+            // SDL's macOS/Linux backends report some joysticks asynchronously, so give
+            // them a moment to arrive before comparing against the OS's view.
+            for (int t = 0; t < 40; ++t) { SDL_PumpEvents(); SDL_Delay(25); }
+            registry_.refresh();
+            probe_.setGracePeriodMs(0);  // already waited above
+            probe_.refresh();
+            std::fputs(probe_.report().c_str(), stdout);
+            diagnoseOnly_ = true;
+            return true;
+        }
+    }
+
     int initW = kCanvasW, initH = kCanvasH;
     if (const char* wh = SDL_getenv("SIC_WINDOW_SIZE")) {  // dev aid, e.g. "900x550", for resize testing
         SDL_sscanf(wh, "%dx%d", &initW, &initH);
@@ -121,6 +137,9 @@ bool App::init(int argc, char** argv) {
     if (const char* f = SDL_getenv("SIC_SCREENSHOT_FRAME")) screenshotFrame_ = SDL_atoi(f);
 
     registry_.refresh();
+    // First USB scan shortly after startup; HardwareProbe's grace period keeps
+    // controllers that are still on their way into SDL from being flagged.
+    probeTimer_ = 0.5f;
     if (virtualJs_) registry_.selectJoystickId(virtualJs_->id());
     if (const char* sel = SDL_getenv("SIC_SELECT")) {
         // Dev aid: "keyboard", "mouse", "gamepad", or "joystick" selects the first
@@ -132,14 +151,16 @@ bool App::init(int argc, char** argv) {
                                (SDL_strcmp(sel, "joystick") == 0 && d.id.kind == DeviceKind::Joystick);
             if (match) { registry_.select(d.id); break; }
         }
+        if (SDL_strcmp(sel, "diagnostics") == 0) { probe_.refresh(); if (!probe_.findings().empty()) ui_.selectFinding(0); }
     }
     lastTicks_ = SDL_GetTicksNS();
     return true;
 }
 
 SDL_AppResult App::handleEvent(const SDL_Event& e) {
+    if (diagnoseOnly_) return SDL_APP_SUCCESS;
     ImGui_ImplSDL3_ProcessEvent(&e);
-    registry_.handleEvent(e);
+    if (registry_.handleEvent(e)) probeTimer_ = 0.0f;  // re-check right away on any hot-plug
     if (view_) view_->handleEvent(e);
     switch (e.type) {
         case SDL_EVENT_QUIT:
@@ -153,7 +174,15 @@ SDL_AppResult App::handleEvent(const SDL_Event& e) {
     return SDL_APP_CONTINUE;
 }
 
+void App::runProbe() {
+    const size_t before = probe_.findings().size();
+    probe_.refresh();
+    probeTimer_ = 2.0f;
+    if (probe_.findings().size() != before) SDL_Log("%s", probe_.report().c_str());
+}
+
 SDL_AppResult App::iterate() {
+    if (diagnoseOnly_) return SDL_APP_SUCCESS;
     const Uint64 now = SDL_GetTicksNS();
     const float dt = static_cast<float>(now - lastTicks_) / 1e9f;
     lastTicks_ = now;
@@ -161,12 +190,14 @@ SDL_AppResult App::iterate() {
     time_ += dt;
     ++frame_;
     if (virtualJs_) virtualJs_->animate(time_);
+    // A USB device SDL can't open produces no SDL event, so poll the OS view too.
+    if ((probeTimer_ -= dt) <= 0.0f) runProbe();
 
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
 
-    ui_.draw(registry_, quitRequested_);
+    ui_.draw(registry_, probe_, quitRequested_);
     if (quitRequested_) return SDL_APP_SUCCESS;
     syncView();
     if (view_) view_->update(dt_);
@@ -237,7 +268,11 @@ void App::drawCanvas() {
     if (sel) {
         canvas.textf(area.x + 24, 24, colors::text, 2.0f, "%s: %s", deviceKindName(sel->id.kind), sel->name.c_str());
         canvas.text(area.x + 24, 52, "Visualiser for this device kind arrives in a later milestone.", colors::dim);
-    } else {
+    } else if (!ui_.findingSelected()) {
         canvas.text(area.x + 24, 24, "Select a device in the sidebar to visualise it.", colors::dim, 2.0f);
+        if (const size_t n = probe_.findings().size()) {
+            canvas.textf(area.x + 24, 56, colors::accent, 1.5f,
+                         "%zu diagnostics note%s in the sidebar: hardware SDL can't fully use.", n, n == 1 ? "" : "s");
+        }
     }
 }

@@ -38,6 +38,15 @@ picture of what the selected one is reporting.
   layout, so a non-US layout shows its own characters on the same physical
   positions. Includes a last-key panel (name/scancode/keycode/repeat) and a
   text-input box for checking dead-key and IME composition.
+- **Diagnostics**: compares the OS's own USB device list (IOKit on macOS,
+  sysfs on Linux) with what SDL enumerated, and lists controllers that are
+  plugged in but missing or only half-recognised, with the reason and a fix.
+  For example, a Logitech F310/F510/F710 with its switch on **X** (XInput)
+  is invisible to SDL on macOS because no driver claims it; switching to
+  **D** makes it a normal HID gamepad. Also flags XInput pads without the
+  `xpad` driver or `/dev/input` permission problems on Linux, devices
+  hidden by `SDL_GAMECONTROLLER_IGNORE_DEVICES`, and pads SDL sees only as
+  a raw joystick. Run `sdl-input-checker --diagnose` for a terminal report.
 - **Mouse view**: state of up to 8 buttons (L, R, M, X1, X2, 6–8) plus the
   raw index of the last button event, an XY motion-trail pad, a decaying wheel
   meter, and a toggle for relative (captured) mouse mode.
@@ -106,8 +115,9 @@ plugging in hardware, useful for screenshots and quick manual checks:
 
 | Aid | Effect |
 |---|---|
+| `--diagnose` | Prints the hardware diagnostics report (OS-visible USB devices vs. SDL) to stdout and exits without opening a window. |
 | `--virtual` | Attaches an SDL virtual joystick with animated axes/buttons/hat and selects it at startup. |
-| `SIC_SELECT=<kind>` | Auto-selects the first device of the given kind (`gamepad`, `joystick`, `keyboard`, `mouse`) at startup, instead of requiring a sidebar click. |
+| `SIC_SELECT=<kind>` | Auto-selects the first device of the given kind (`gamepad`, `joystick`, `keyboard`, `mouse`), or `diagnostics` to open the first diagnostics note at startup, instead of requiring a sidebar click. |
 | `SIC_WINDOW_SIZE=WxH` | Opens the window at a specific size, e.g. `800x500`, for resize testing. |
 | `SIC_SCREENSHOT=path.png` | Saves one frame as a PNG (or BMP if the path ends in `.bmp`) and quits. |
 | `SIC_SCREENSHOT_FRAME=N` | Which frame number to save (default 30). |
@@ -126,6 +136,7 @@ src/
 ├── app/                  Window/renderer/ImGui ownership, sidebar UI
 ├── devices/               Enumeration, hot-plug, per-frame state sampling
 │   ├── DeviceRegistry     Enumerates and opens gamepads/joysticks/kbd/mice
+│   ├── HardwareProbe      OS-level USB scan; explains controllers SDL can't see
 │   ├── *State.h           Per-frame snapshot structs (Gamepad/Joystick/Keyboard/Mouse)
 │   ├── KeyboardLayout     Physical ANSI key-position table
 │   └── VirtualJoystick    Dev aid: animated SDL virtual joystick

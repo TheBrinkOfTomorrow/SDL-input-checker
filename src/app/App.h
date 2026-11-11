@@ -6,6 +6,7 @@
 
 #include "app/Ui.h"
 #include "devices/DeviceRegistry.h"
+#include "devices/HardwareProbe.h"
 #include "devices/VirtualJoystick.h"
 #include "views/View.h"
 
@@ -27,10 +28,13 @@ public:
 private:
     void drawCanvas();
     void syncView();
+    void runProbe();
 
     SDL_Window* window_ = nullptr;
     SDL_Renderer* renderer_ = nullptr;
     DeviceRegistry registry_;
+    HardwareProbe probe_;
+    float probeTimer_ = 0.0f;  // seconds until the next USB re-scan
     Ui ui_;
     std::unique_ptr<View> view_;
     std::optional<DeviceId> viewFor_;
@@ -42,4 +46,5 @@ private:
     int screenshotFrame_ = 30;               // SIC_SCREENSHOT_FRAME env
     Uint64 lastTicks_ = 0;
     bool quitRequested_ = false;
+    bool diagnoseOnly_ = false;  // --diagnose: print report and exit
 };
