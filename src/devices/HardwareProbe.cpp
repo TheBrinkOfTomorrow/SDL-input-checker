@@ -288,7 +288,10 @@ void HardwareProbe::refresh() {
             if (msp) {
                 detail += std::string("\n\nFix: slide the X/D switch on the controller to D. The receiver will "
                                       "re-enumerate as product id ") + hex4(msp->dinputPid) +
-                          " (a normal HID gamepad), which SDL picks up immediately.";
+                          " (a normal HID gamepad), which SDL picks up immediately. The receiver only changes "
+                          "identity once the controller reconnects: press a button (or the Logitech button) to wake "
+                          "it, and if the id below still reads " + hex4(msp->xinputPid) +
+                          ", unplug and re-plug the receiver.";
             }
             findings_.push_back({FindingLevel::Problem, label(d, known), "In XInput mode: no driver",
                                  std::move(detail)});
